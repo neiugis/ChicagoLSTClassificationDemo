@@ -84,7 +84,7 @@
 </div>
 
 <div class="panel" id="legend-panel">
-  <h4>LST mean (&deg;C)</h4>
+  <h4 id="legend-title">LST mean (&deg;C)</h4>
   <div id="legend-body"></div>
   <div id="stat-line" class="stat-line"></div>
 </div>
@@ -126,6 +126,19 @@ function stdDevBreaks(values, k){
 function classify(value, breaks){
   for(let i=0;i<breaks.length;i++){ if(value <= breaks[i]) return i; }
   return breaks.length;
+}
+function sdLabels(k){
+  // Class limits in SD units, matching stdDevBreaks: e.g. k=6 -> -2,-1,0,1,2
+  const first = -(k - 2) / 2, lim = [];
+  for(let i=0;i<k-1;i++) lim.push(first + i);
+  const f = v => (v < 0 ? '\u2212' : '') + String(Math.abs(v));
+  const out = [];
+  for(let i=0;i<k;i++){
+    if(i===0) out.push('< ' + f(lim[0]) + ' Std. Dev.');
+    else if(i===k-1) out.push('> ' + f(lim[k-2]) + ' Std. Dev.');
+    else out.push(f(lim[i-1]) + ' \u2013 ' + f(lim[i]) + ' Std. Dev.');
+  }
+  return out;
 }
 function breaksToLabels(breaks){
   const f = v => v.toFixed(1), n = breaks.length + 1, out = [];
@@ -207,7 +220,11 @@ function render(){
     }
   }).addTo(map);
 
-  const labels = breaksToLabels(breaks);
+  const isSD = document.getElementById('method').value === 'stddev';
+  const labels = isSD ? sdLabels(K) : breaksToLabels(breaks);
+  document.getElementById('legend-title').innerHTML = isSD
+    ? 'LST Deviation from Mean<br><span style="font-weight:normal">(mean = ' + dataMean.toFixed(1) + ' &deg;C, 1 SD = ' + stdev(values).toFixed(1) + ' &deg;C)</span>'
+    : 'LST mean (&deg;C)';
   const body = document.getElementById('legend-body');
   body.innerHTML = '';
   for(let i=K-1;i>=0;i--){   // high values at the top of the legend
