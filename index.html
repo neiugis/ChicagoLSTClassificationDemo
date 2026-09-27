@@ -33,7 +33,7 @@
   #manual-row { display:none; }
   .leaflet-popup-content { font-size:13px; }
   .credit {
-    position:absolute; bottom:22px; left:8px; font-size:11px; color:#444;
+    position:absolute; bottom:22px; left:8px; font-size:16px; color:#333;
     background:rgba(255,255,255,0.85); padding:2px 6px; border-radius:4px; z-index:1000;
   }
 </style>
@@ -47,6 +47,7 @@
   <select id="method">
     <option value="equal">Equal interval</option>
     <option value="quantile">Quantile</option>
+    <option value="natural">Natural breaks (Jenks)</option>
     <option value="stddev">Standard deviation</option>
     <option value="manual">Manual breaks</option>
   </select>
@@ -55,13 +56,16 @@
   <select id="scheme">
     <optgroup label="Sequential">
       <option value="seqYlOrRd">Sequential Yellow-Orange-Red</option>
-      <option value="seqBlues">Sequential Blues</option>
-      <option value="seqGreens">Sequential Greens</option>
+      <option value="misSeqRev">Sequential Red-Orange-Yellow (reversed)</option>
     </optgroup>
     <optgroup label="Diverging">
+      <option value="divBuYlRd">Diverging Blue-Yellow-Red</option>
       <option value="divBuRd">Diverging Blue-Red</option>
-      <option value="divBrTeal">Diverging Brown-Teal</option>
-      <option value="divOrPu">Diverging Orange-Purple</option>
+      <option value="misRdYlBu">Diverging Red-Yellow-Blue (reversed)</option>
+      <option value="misBrTeal">Diverging Brown-Teal</option>
+    </optgroup>
+    <optgroup label="Qualitative">
+      <option value="qualSet1">Qualitative</option>
     </optgroup>
   </select>
 
@@ -85,7 +89,7 @@
   <div id="stat-line" class="stat-line"></div>
 </div>
 
-<div class="credit">Chicago fishnet LST (mean), aggregated from 90&nbsp;m to 270&nbsp;m for display</div>
+<div class="credit">Chicago Land Surface Temperature (LST), Summer 2022 average, aggregated to a 270&nbsp;m fishnet grid</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -93,7 +97,7 @@ const FISHNET_DATA = {"type":"FeatureCollection","features":[{"type":"Feature","
 </script>
 <script>
 /* ColorBrewer schemes for 3 to 9 classes, ordered from low values to high values */
-const SCHEMES = {"seqYlOrRd": {"3": ["#ffeda0", "#feb24c", "#f03b20"], "4": ["#ffffb2", "#fecc5c", "#fd8d3c", "#e31a1c"], "5": ["#ffffb2", "#fecc5c", "#fd8d3c", "#f03b20", "#bd0026"], "6": ["#ffffb2", "#fed976", "#feb24c", "#fd8d3c", "#f03b20", "#bd0026"], "7": ["#ffffb2", "#fed976", "#feb24c", "#fd8d3c", "#fc4e2a", "#e31a1c", "#b10026"], "8": ["#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#fc4e2a", "#e31a1c", "#b10026"], "9": ["#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#fc4e2a", "#e31a1c", "#bd0026", "#800026"]}, "seqBlues": {"3": ["#deebf7", "#9ecae1", "#3182bd"], "4": ["#eff3ff", "#bdd7e7", "#6baed6", "#2171b5"], "5": ["#eff3ff", "#bdd7e7", "#6baed6", "#3182bd", "#08519c"], "6": ["#eff3ff", "#c6dbef", "#9ecae1", "#6baed6", "#3182bd", "#08519c"], "7": ["#eff3ff", "#c6dbef", "#9ecae1", "#6baed6", "#4292c6", "#2171b5", "#084594"], "8": ["#f7fbff", "#deebf7", "#c6dbef", "#9ecae1", "#6baed6", "#4292c6", "#2171b5", "#084594"], "9": ["#f7fbff", "#deebf7", "#c6dbef", "#9ecae1", "#6baed6", "#4292c6", "#2171b5", "#08519c", "#08306b"]}, "seqGreens": {"3": ["#e5f5e0", "#a1d99b", "#31a354"], "4": ["#edf8e9", "#bae4b3", "#74c476", "#238b45"], "5": ["#edf8e9", "#bae4b3", "#74c476", "#31a354", "#006d2c"], "6": ["#edf8e9", "#c7e9c0", "#a1d99b", "#74c476", "#31a354", "#006d2c"], "7": ["#edf8e9", "#c7e9c0", "#a1d99b", "#74c476", "#41ab5d", "#238b45", "#005a32"], "8": ["#f7fcf5", "#e5f5e0", "#c7e9c0", "#a1d99b", "#74c476", "#41ab5d", "#238b45", "#005a32"], "9": ["#f7fcf5", "#e5f5e0", "#c7e9c0", "#a1d99b", "#74c476", "#41ab5d", "#238b45", "#006d2c", "#00441b"]}, "divBuRd": {"3": ["#67a9cf", "#f7f7f7", "#ef8a62"], "4": ["#0571b0", "#92c5de", "#f4a582", "#ca0020"], "5": ["#0571b0", "#92c5de", "#f7f7f7", "#f4a582", "#ca0020"], "6": ["#2166ac", "#67a9cf", "#d1e5f0", "#fddbc7", "#ef8a62", "#b2182b"], "7": ["#2166ac", "#67a9cf", "#d1e5f0", "#f7f7f7", "#fddbc7", "#ef8a62", "#b2182b"], "8": ["#2166ac", "#4393c3", "#92c5de", "#d1e5f0", "#fddbc7", "#f4a582", "#d6604d", "#b2182b"], "9": ["#2166ac", "#4393c3", "#92c5de", "#d1e5f0", "#f7f7f7", "#fddbc7", "#f4a582", "#d6604d", "#b2182b"]}, "divBrTeal": {"3": ["#d8b365", "#f5f5f5", "#5ab4ac"], "4": ["#a6611a", "#dfc27d", "#80cdc1", "#018571"], "5": ["#a6611a", "#dfc27d", "#f5f5f5", "#80cdc1", "#018571"], "6": ["#8c510a", "#d8b365", "#f6e8c3", "#c7eae5", "#5ab4ac", "#01665e"], "7": ["#8c510a", "#d8b365", "#f6e8c3", "#f5f5f5", "#c7eae5", "#5ab4ac", "#01665e"], "8": ["#8c510a", "#bf812d", "#dfc27d", "#f6e8c3", "#c7eae5", "#80cdc1", "#35978f", "#01665e"], "9": ["#8c510a", "#bf812d", "#dfc27d", "#f6e8c3", "#f5f5f5", "#c7eae5", "#80cdc1", "#35978f", "#01665e"]}, "divOrPu": {"3": ["#f1a340", "#f7f7f7", "#998ec3"], "4": ["#e66101", "#fdb863", "#b2abd2", "#5e3c99"], "5": ["#e66101", "#fdb863", "#f7f7f7", "#b2abd2", "#5e3c99"], "6": ["#b35806", "#f1a340", "#fee0b6", "#d8daeb", "#998ec3", "#542788"], "7": ["#b35806", "#f1a340", "#fee0b6", "#f7f7f7", "#d8daeb", "#998ec3", "#542788"], "8": ["#b35806", "#e08214", "#fdb863", "#fee0b6", "#d8daeb", "#b2abd2", "#8073ac", "#542788"], "9": ["#b35806", "#e08214", "#fdb863", "#fee0b6", "#f7f7f7", "#d8daeb", "#b2abd2", "#8073ac", "#542788"]}};
+const SCHEMES = {"seqYlOrRd": {"3": ["#ffeda0", "#feb24c", "#f03b20"], "4": ["#ffffb2", "#fecc5c", "#fd8d3c", "#e31a1c"], "5": ["#ffffb2", "#fecc5c", "#fd8d3c", "#f03b20", "#bd0026"], "6": ["#ffffb2", "#fed976", "#feb24c", "#fd8d3c", "#f03b20", "#bd0026"], "7": ["#ffffb2", "#fed976", "#feb24c", "#fd8d3c", "#fc4e2a", "#e31a1c", "#b10026"], "8": ["#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#fc4e2a", "#e31a1c", "#b10026"], "9": ["#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#fc4e2a", "#e31a1c", "#bd0026", "#800026"]}, "divBuYlRd": {"3": ["#91bfdb", "#ffffbf", "#fc8d59"], "4": ["#2c7bb6", "#abd9e9", "#fdae61", "#d7191c"], "5": ["#2c7bb6", "#abd9e9", "#ffffbf", "#fdae61", "#d7191c"], "6": ["#4575b4", "#91bfdb", "#e0f3f8", "#fee090", "#fc8d59", "#d73027"], "7": ["#4575b4", "#91bfdb", "#e0f3f8", "#ffffbf", "#fee090", "#fc8d59", "#d73027"], "8": ["#4575b4", "#74add1", "#abd9e9", "#e0f3f8", "#fee090", "#fdae61", "#f46d43", "#d73027"], "9": ["#4575b4", "#74add1", "#abd9e9", "#e0f3f8", "#ffffbf", "#fee090", "#fdae61", "#f46d43", "#d73027"]}, "divBuRd": {"3": ["#67a9cf", "#f7f7f7", "#ef8a62"], "4": ["#0571b0", "#92c5de", "#f4a582", "#ca0020"], "5": ["#0571b0", "#92c5de", "#f7f7f7", "#f4a582", "#ca0020"], "6": ["#2166ac", "#67a9cf", "#d1e5f0", "#fddbc7", "#ef8a62", "#b2182b"], "7": ["#2166ac", "#67a9cf", "#d1e5f0", "#f7f7f7", "#fddbc7", "#ef8a62", "#b2182b"], "8": ["#2166ac", "#4393c3", "#92c5de", "#d1e5f0", "#fddbc7", "#f4a582", "#d6604d", "#b2182b"], "9": ["#2166ac", "#4393c3", "#92c5de", "#d1e5f0", "#f7f7f7", "#fddbc7", "#f4a582", "#d6604d", "#b2182b"]}, "misBrTeal": {"3": ["#d8b365", "#f5f5f5", "#5ab4ac"], "4": ["#a6611a", "#dfc27d", "#80cdc1", "#018571"], "5": ["#a6611a", "#dfc27d", "#f5f5f5", "#80cdc1", "#018571"], "6": ["#8c510a", "#d8b365", "#f6e8c3", "#c7eae5", "#5ab4ac", "#01665e"], "7": ["#8c510a", "#d8b365", "#f6e8c3", "#f5f5f5", "#c7eae5", "#5ab4ac", "#01665e"], "8": ["#8c510a", "#bf812d", "#dfc27d", "#f6e8c3", "#c7eae5", "#80cdc1", "#35978f", "#01665e"], "9": ["#8c510a", "#bf812d", "#dfc27d", "#f6e8c3", "#f5f5f5", "#c7eae5", "#80cdc1", "#35978f", "#01665e"]}, "misRdYlBu": {"3": ["#fc8d59", "#ffffbf", "#91bfdb"], "4": ["#d7191c", "#fdae61", "#abd9e9", "#2c7bb6"], "5": ["#d7191c", "#fdae61", "#ffffbf", "#abd9e9", "#2c7bb6"], "6": ["#d73027", "#fc8d59", "#fee090", "#e0f3f8", "#91bfdb", "#4575b4"], "7": ["#d73027", "#fc8d59", "#fee090", "#ffffbf", "#e0f3f8", "#91bfdb", "#4575b4"], "8": ["#d73027", "#f46d43", "#fdae61", "#fee090", "#e0f3f8", "#abd9e9", "#74add1", "#4575b4"], "9": ["#d73027", "#f46d43", "#fdae61", "#fee090", "#ffffbf", "#e0f3f8", "#abd9e9", "#74add1", "#4575b4"]}, "qualSet1": {"3": ["#e41a1c", "#377eb8", "#4daf4a"], "4": ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3"], "5": ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00"], "6": ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#ffff33"], "7": ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#ffff33", "#a65628"], "8": ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#ffff33", "#a65628", "#f781bf"], "9": ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#ffff33", "#a65628", "#f781bf", "#999999"]}, "misSeqRev": {"3": ["#f03b20", "#feb24c", "#ffeda0"], "4": ["#e31a1c", "#fd8d3c", "#fecc5c", "#ffffb2"], "5": ["#bd0026", "#f03b20", "#fd8d3c", "#fecc5c", "#ffffb2"], "6": ["#bd0026", "#f03b20", "#fd8d3c", "#feb24c", "#fed976", "#ffffb2"], "7": ["#b10026", "#e31a1c", "#fc4e2a", "#fd8d3c", "#feb24c", "#fed976", "#ffffb2"], "8": ["#b10026", "#e31a1c", "#fc4e2a", "#fd8d3c", "#feb24c", "#fed976", "#ffeda0", "#ffffcc"], "9": ["#800026", "#bd0026", "#e31a1c", "#fc4e2a", "#fd8d3c", "#feb24c", "#fed976", "#ffeda0", "#ffffcc"]}};
 function numClasses(){ return parseInt(document.getElementById('nclass').value, 10); }
 
 /* Classification methods: each returns k-1 breaks for k classes */
@@ -106,6 +110,9 @@ function quantileBreaks(values, k){
   for(let i=1;i<k;i++) b.push(s[Math.floor((s.length-1)*(i/k))]);
   return b;
 }
+/* Natural breaks (Jenks), computed in advance on all 8,612 cells for 3 to 9 classes.
+   Values are the upper limit of each class except the last. */
+const NATURAL_BREAKS = {"3": [34.814, 39.911], "4": [33.519, 38.011, 40.98], "5": [31.952, 36.087, 38.972, 41.461], "6": [30.966, 34.958, 37.865, 39.983, 42.087], "7": [30.626, 34.425, 37.157, 39.038, 40.714, 42.507], "8": [29.998, 33.395, 35.976, 37.871, 39.448, 40.988, 42.695], "9": [28.995, 32.223, 34.991, 37.15, 38.762, 40.242, 41.817, 43.653]};
 function mean(v){ return v.reduce((a,b)=>a+b,0)/v.length; }
 function stdev(v){ const m=mean(v); return Math.sqrt(v.reduce((a,b)=>a+(b-m)*(b-m),0)/(v.length-1)); }
 /* One standard deviation per class. Even k: the mean is a break.
@@ -174,6 +181,7 @@ function computeBreaks(){
   const k = numClasses();
   if(method === 'equal') return equalInterval(values, k);
   if(method === 'quantile') return quantileBreaks(values, k);
+  if(method === 'natural') return NATURAL_BREAKS[k];
   if(method === 'stddev') return stdDevBreaks(values, k);
   return readManualBreaks();
 }
